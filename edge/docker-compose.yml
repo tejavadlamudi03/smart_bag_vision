@@ -1,0 +1,17 @@
+# BagVision inspection service - import this file in the Industrial Edge App Publisher.
+# Industrial Edge supports compose file version 2.4.
+version: "2.4"
+services:
+  bagvision-ai:
+    image: bagvision-ai:1.0.0
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    environment:
+      - PORT=8100
+      - AI_TOKEN=change-me            # the dashboard must send the same token
+    mem_limit: 4g
+    volumes:
+      - ./publish/bagvision-ai:/data
+    # IPC with an NVIDIA GPU: build with TORCH=cu130 and uncomment
+    # runtime: nvidia

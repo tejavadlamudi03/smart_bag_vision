@@ -1,0 +1,6 @@
+numpy==2.5.4
+opencv-python==4.13.0.92
+pyserial==3.5
+pyrealsense2==2.59.1
+ultralytics==8.4.36
+matplotlib

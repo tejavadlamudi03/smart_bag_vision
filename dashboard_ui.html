@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BagVision Control Center</title>
+<style>
+:root{
+  --bg:#080b11; --bg2:#0c1018; --panel:#111722; --panel2:#151c29; --line:#1e2736; --line2:#2a3446;
+  --text:#e6ebf4; --muted:#8792a8; --dim:#5d6780;
+  --accent:#38bdf8; --accent2:#818cf8; --good:#22c55e; --bad:#ef4444; --warn:#f59e0b; --empty:#64748b;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#122036 0%,transparent 60%),var(--bg);
+  color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+
+/* sidebar */
+aside.nav{background:linear-gradient(180deg,#0b1019,#090d14);border-right:1px solid var(--line);padding:18px 14px;
+  display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:11px;padding:4px 8px 18px}
+.logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 6px 22px rgba(56,189,248,.35)}
+.brand b{font-size:15.5px;letter-spacing:.2px;display:block}
+.brand small{color:var(--muted);font-size:11.5px}
+.navbtn{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;color:var(--muted);
+  cursor:pointer;border:1px solid transparent;font-weight:550;user-select:none;transition:.15s}
+.navbtn svg{width:19px;height:19px;flex:none}
+.navbtn:hover{background:var(--panel);color:var(--text)}
+.navbtn.on{background:linear-gradient(90deg,rgba(56,189,248,.16),rgba(56,189,248,.03));color:var(--text);
+  border-color:rgba(56,189,248,.25)}
+.navbtn.on svg{color:var(--accent)}
+.navbtn .badge{margin-left:auto;background:var(--warn);color:#1a1205;font-size:11px;font-weight:800;
+  border-radius:20px;padding:1px 7px;display:none}
+.sys{margin-top:auto;border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:8px}
+.sysrow{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12.5px;padding:0 6px}
+.led{width:8px;height:8px;border-radius:50%;background:var(--dim);display:inline-block;margin-right:8px}
+.led.ok{background:var(--good);box-shadow:0 0 10px var(--good)}.led.bad{background:var(--bad)}.led.busy{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+
+/* header */
+main{min-width:0}
+header.top{display:flex;align-items:center;gap:16px;padding:16px 26px;border-bottom:1px solid var(--line);
+  background:rgba(8,11,17,.75);backdrop-filter:blur(10px);position:sticky;top:0;z-index:5}
+header h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.2px}
+header .sub{color:var(--muted);font-size:12.5px}
+.spacer{flex:1}
+.clock{text-align:right}.clock b{font-size:18px;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+.clock div{color:var(--muted);font-size:11.5px}
+.estop{background:radial-gradient(circle at 50% 35%,#ff5a5a,#c81e1e);color:#fff;border:3px solid #ffd2d2;
+  border-radius:12px;padding:10px 18px;font-weight:900;letter-spacing:1.5px;cursor:pointer;
+  box-shadow:0 0 0 4px rgba(239,68,68,.18),0 8px 24px rgba(239,68,68,.35);font-size:14px}
+.estop:active{transform:translateY(1px)}
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);
+  border:1px solid var(--line2);border-radius:20px;padding:5px 11px}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--bad);animation:blink 1.3s infinite}
+@keyframes blink{50%{opacity:.2}}
+
+/* pages */
+.page{display:none;padding:22px 26px 34px;gap:18px}
+.page.on{display:grid}
+.card{background:linear-gradient(180deg,var(--panel),#0f141e);border:1px solid var(--line);border-radius:var(--r);
+  padding:16px;min-width:0}
+.card h3{margin:0 0 12px;font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1.1px;font-weight:700;
+  display:flex;align-items:center;gap:8px}
+.card h3 .r{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500}
+.grid2{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(320px,1fr);gap:18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* video */
+.video{position:relative;border-radius:11px;overflow:hidden;background:#000;aspect-ratio:16/9;border:1px solid var(--line2)}
+.video img{width:100%;height:100%;object-fit:contain;display:block}
+.video canvas{position:absolute;inset:0;width:100%;height:100%}
+.video .ov{position:absolute;left:12px;top:12px;display:flex;gap:8px}
+.chip{background:rgba(8,11,17,.72);border:1px solid var(--line2);border-radius:20px;padding:4px 11px;font-size:12px;color:var(--text)}
+
+/* buttons / inputs */
+a.btn{text-decoration:none;display:inline-block}
+button,.btn{background:var(--panel2);color:var(--text);border:1px solid var(--line2);border-radius:10px;
+  padding:9px 15px;font:inherit;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+button:hover{border-color:var(--accent);color:#fff}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.pri{background:linear-gradient(135deg,#0ea5e9,#6366f1);border-color:transparent;color:#fff}
+button.good{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.45);color:#86efac}
+button.bad{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.45);color:#fca5a5}
+button.warn{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.45);color:#fcd34d}
+button.big{padding:15px 20px;font-size:15.5px;border-radius:12px}
+button.on{outline:2px solid var(--accent)}
+input,select{background:#0a0e15;color:var(--text);border:1px solid var(--line2);border-radius:9px;padding:8px 10px;font:inherit;width:100%}
+label.f{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:12px;min-width:0}
+input[type=range]{padding:0;accent-color:var(--accent)}
+
+/* place cards */
+.places{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.place{border-radius:12px;padding:16px 12px;text-align:center;border:1.5px solid var(--line2);background:#0b1019;transition:.25s}
+.place .n{color:var(--muted);font-size:11.5px;letter-spacing:1.2px;text-transform:uppercase}
+.place .v{font-size:30px;font-weight:800;margin:6px 0 2px;letter-spacing:.5px}
+.place .c{color:var(--muted);font-size:12.5px}
+.place.GOOD{border-color:var(--good);background:radial-gradient(circle at 50% 0,rgba(34,197,94,.22),#0b1019 70%)}
+.place.GOOD .v{color:var(--good)}
+.place.BAD{border-color:var(--bad);background:radial-gradient(circle at 50% 0,rgba(239,68,68,.25),#0b1019 70%);animation:pulse 1.2s infinite}
+.place.BAD .v{color:var(--bad)}
+.place.EMPTY .v{color:var(--empty)}
+.place.CHECK{border-color:var(--warn);background:radial-gradient(circle at 50% 0,rgba(245,158,11,.22),#0b1019 70%)}
+.place.CHECK .v{color:var(--warn)}
+.anom{margin-top:8px;font-size:11.5px;color:var(--muted)}.anom .bar{margin-top:4px;height:6px}
+@keyframes pulse{50%{box-shadow:0 0 0 4px rgba(239,68,68,.15)}}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kpi{background:linear-gradient(180deg,var(--panel),#0f141e);border:1px solid var(--line);border-radius:var(--r);padding:15px 16px;
+  position:relative;overflow:hidden}
+.kpi .l{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:1px;font-weight:700}
+.kpi .v{font-size:31px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.kpi .s{color:var(--dim);font-size:12px;margin-top:2px}
+.kpi::after{content:"";position:absolute;right:-30px;top:-30px;width:90px;height:90px;border-radius:50%;
+  background:var(--glow,rgba(56,189,248,.10))}
+.kpi.g{--glow:rgba(34,197,94,.13)}.kpi.g .v{color:var(--good)}
+.kpi.b{--glow:rgba(239,68,68,.13)}.kpi.b .v{color:var(--bad)}
+.kpi.w{--glow:rgba(245,158,11,.13)}.kpi.w .v{color:var(--warn)}
+.mini{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.mini .kpi .v{font-size:25px}
+
+/* ring */
+.ringwrap{display:flex;align-items:center;gap:18px}
+.ring{width:118px;height:118px;flex:none}
+.legend div{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;margin:5px 0}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+/* lists */
+.strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
+.ev{background:#0b1019;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.ev img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;background:#000}
+.ev .m{padding:7px 9px;font-size:12px;color:var(--muted)}
+.tag{font-weight:800;font-size:11.5px;padding:2px 8px;border-radius:6px;letter-spacing:.4px}
+.tag.GOOD{background:rgba(34,197,94,.16);color:var(--good)}.tag.BAD{background:rgba(239,68,68,.16);color:var(--bad)}
+.tag.U{background:rgba(245,158,11,.16);color:var(--warn)}
+.none{color:var(--dim);padding:18px;text-align:center;font-size:13px}
+.log{background:#070a10;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;
+  color:#a9b6cc;max-height:260px;overflow:auto;white-space:pre-wrap}
+
+/* robots */
+.robots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.rb .hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.rb .hd b{font-size:15.5px}
+.pill{font-size:11.5px;font-weight:800;border-radius:20px;padding:3px 10px;letter-spacing:.4px}
+.pill.ok{background:rgba(34,197,94,.14);color:var(--good)}.pill.off{background:rgba(100,116,139,.18);color:#94a3b8}
+.pill.busy{background:rgba(245,158,11,.15);color:var(--warn)}
+.tele{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.tele div{background:#0a0e15;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+.tele small{color:var(--dim);font-size:11px;display:block}
+.tele b{font-variant-numeric:tabular-nums;font-size:15px}
+.joints{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.jt{display:grid;grid-template-columns:86px 1fr 46px;gap:8px;align-items:center;font-size:11.5px;color:var(--muted)}
+.bar{height:6px;background:#0a0e15;border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.ctl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.prog{color:var(--muted);font-size:12.5px;margin-top:8px;min-height:18px}
+.err{color:#fca5a5;font-size:12px;margin-top:6px}
+.pbar{height:10px;border-radius:6px;background:#0a0e15;border:1px solid var(--line);overflow:hidden}
+.pbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--good),var(--accent));transition:width .5s}
+
+/* teach */
+.steps{display:flex;flex-direction:column;gap:12px}
+.step{display:grid;grid-template-columns:40px 1fr;gap:14px;align-items:start;padding:14px;border-radius:12px;
+  border:1px solid var(--line);background:#0b1019;opacity:.5}
+.step.act{opacity:1;border-color:rgba(56,189,248,.45);background:linear-gradient(90deg,rgba(56,189,248,.08),#0b1019)}
+.step.done{opacity:.85}
+.step .num{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:800;
+  background:var(--panel2);border:1px solid var(--line2)}
+.step.act .num{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:0}
+.step.done .num{background:rgba(34,197,94,.18);color:var(--good)}
+.step b{display:block;font-size:15px;margin-bottom:3px}.step p{margin:0 0 10px;color:var(--muted);font-size:13px}
+.rec{display:inline-flex;align-items:center;gap:8px;font-weight:800;color:var(--bad)}
+.rec i{width:11px;height:11px;border-radius:50%;background:var(--bad);animation:blink 1s infinite}
+.readout{font:600 22px ui-monospace,Menlo,monospace;letter-spacing:.5px;margin:8px 0}
+
+/* dataset */
+.classes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.cls .v{font-size:28px;font-weight:800}
+.alarm{color:#fcd34d;font-size:12.5px;padding:6px 0;border-bottom:1px dashed var(--line)}
+/* status bar + flow */
+header.top{flex-wrap:wrap}
+.sbar{flex-basis:100%;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:12px;margin-top:2px;border-top:1px solid var(--line)}
+.sbar .st{display:flex;align-items:center;gap:8px;font-weight:800;font-size:13px;letter-spacing:.5px}
+.sbar .st i{width:10px;height:10px;border-radius:50%;background:var(--dim)}
+.sbar .st.run i{background:var(--good);box-shadow:0 0 10px var(--good);animation:blink 1.2s infinite}
+.flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fs{padding:5px 11px;border-radius:20px;font-size:12px;font-weight:700;border:1px solid var(--line2);color:var(--dim);background:#0a0e15;white-space:nowrap}
+.fs.done{color:var(--good);border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.08)}
+.fs.active{color:#fff;border-color:var(--accent);background:linear-gradient(135deg,rgba(14,165,233,.35),rgba(99,102,241,.35));box-shadow:0 0 14px rgba(56,189,248,.35)}
+.fs.next{color:var(--warn);border-color:rgba(245,158,11,.45)}
+.arrow{color:var(--dim);font-size:12px}
+.rchip{display:flex;align-items:center;gap:7px;font-size:12px;padding:5px 10px;border-radius:9px;background:#0a0e15;border:1px solid var(--line)}
+.rchip b{font-size:12px}.rchip span{color:var(--muted)}
+.rchip.working{border-color:rgba(56,189,248,.5)}.rchip.working b{color:var(--accent)}
+.rchip.waiting b{color:var(--warn)}.rchip.error{border-color:var(--bad)}.rchip.error b{color:var(--bad)}
+.bigflow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:14px 0}
+.bf{border:1.5px solid var(--line2);border-radius:12px;padding:12px 10px;text-align:center;background:#0b1019;position:relative;transition:.25s}
+.bf .ic{font-size:22px}.bf b{display:block;font-size:13px;margin-top:4px}.bf small{color:var(--muted);font-size:11.5px;display:block;min-height:16px}
+.bf.done{border-color:rgba(34,197,94,.55);background:linear-gradient(180deg,rgba(34,197,94,.10),#0b1019)}
+.bf.active{border-color:var(--accent);background:linear-gradient(180deg,rgba(56,189,248,.20),#0b1019);box-shadow:0 0 0 3px rgba(56,189,248,.15)}
+.bf.active::after{content:"WORKING";position:absolute;top:-9px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;
+  background:var(--accent);color:#04121c;padding:1px 7px;border-radius:6px;letter-spacing:.6px}
+.bf.next{border-color:rgba(245,158,11,.5)}.bf.next::after{content:"NEXT";position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+  font-size:10px;font-weight:800;background:var(--warn);color:#1a1205;padding:1px 7px;border-radius:6px}
+table.hist{width:100%;border-collapse:collapse;font-size:13px}
+table.hist th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.8px;text-align:left;padding:7px 8px;border-bottom:1px solid var(--line2)}
+table.hist td{padding:7px 8px;border-bottom:1px solid var(--line)}
+.toast{position:fixed;right:22px;bottom:22px;background:#111a2a;border:1px solid var(--line2);border-left:4px solid var(--accent);
+  border-radius:10px;padding:12px 16px;box-shadow:0 10px 30px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);
+  transition:.25s;z-index:20;max-width:420px}
+.toast.show{opacity:1;transform:none}
+.hint{color:var(--dim);font-size:12px}
+@media (max-width:1250px){.grid2,.robots{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:820px){.app{grid-template-columns:1fr}aside.nav{position:static;height:auto;flex-direction:row;flex-wrap:wrap}
+  .sys{display:none}.page{padding:16px}header.top{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="nav">
+  <div class="brand">
+    <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12l-1 13H7L6 7z"/><path d="M9 7a3 3 0 0 1 6 0"/><path d="m9.5 13.5 2 2 3.5-4"/></svg></div>
+    <div><b>BagVision</b><small>Control Center</small></div>
+  </div>
+  <div class="navbtn on" data-p="live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 10 4-3v10l-4-3"/></svg>Live Inspection</div>
+  <div class="navbtn" data-p="prod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Production<span class="badge" id="revBadge">0</span></div>
+  <div class="navbtn" data-p="robots"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21h6"/><path d="M8 21v-5l4-6 5 2"/><circle cx="12" cy="10" r="2"/><path d="m17 12 2 3"/></svg>Robots</div>
+  <div class="navbtn" data-p="teach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8a8 8 0 0 0 16 0v-2a2 2 0 0 0-4 0"/></svg>Teach</div>
+  <div class="navbtn" data-p="data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1a3 3 0 0 1 2 5 3 3 0 0 1-2 5v1a4 4 0 0 1-8 0v-1a3 3 0 0 1-2-5 3 3 0 0 1 2-5V6a4 4 0 0 1 4-4z"/></svg>Dataset &amp; AI</div>
+  <div class="sys">
+    <div class="sysrow"><span><span class="led" id="ledCam"></span>Camera</span><span id="fps">–</span></div>
+    <div class="sysrow"><span><span class="led" id="ledModel"></span>AI model</span><span id="modelTxt">–</span></div>
+    <div class="sysrow"><span><span class="led" id="led_uarm"></span>uArm</span></div>
+    <div class="sysrow"><span><span class="led" id="led_arm1"></span>SO-100 Arm 1</span></div>
+    <div class="sysrow"><span><span class="led" id="led_arm2"></span>SO-100 Arm 2</span></div>
+    <div class="sysrow"><span><span class="led" id="led_buddy"></span>SO-100 Buddy</span></div>
+  </div>
+</aside>
+
+<main>
+<header class="top">
+  <div><h1 id="title">Live Inspection</h1><div class="sub" id="subtitle">Real-time bag quality check · D435 + YOLO11</div></div>
+  <div class="spacer"></div>
+  <span class="live"><i></i>LIVE</span>
+  <div class="clock"><b id="clock">--:--:--</b><div id="date"></div></div>
+  <button class="estop" id="estop" title="Stop all robots now">E-STOP</button>
+  <div class="sbar" id="sbar"></div>
+</header>
+
+<!-- ======================= LIVE ======================= -->
+<section class="page on" id="p-live">
+  <div class="grid2">
+    <div class="card">
+      <h3>Camera · bag places<span class="r row">
+        <span class="hint">Model</span><button id="lvCls" onclick="setDet('classifier')" title="YOLO classifier, trained on good + bad photos">YOLO classifier</button>
+        <button id="lvAno" onclick="setDet('anomaly')" title="defect model: learns from good bags, shows a heatmap">Defect model</button>
+        <span class="hint" id="thrL">BAD threshold</span><input type="range" id="thr" min="0.1" max="0.9" step="0.05" style="width:120px">
+        <b id="thrV" style="width:34px">0.50</b><button onclick="snap()">Snapshot</button></span></h3>
+      <div class="video"><img id="vidLive" alt="live camera"><div class="ov"><span class="chip" id="chipFps">–</span></div></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+      <div class="card"><h3>Bag places<span class="r hint" id="liveType"></span></h3><div class="places" id="placesLive"></div></div>
+      <div class="mini">
+        <div class="kpi"><div class="l">Inspected</div><div class="v" id="lTotal">0</div><div class="s" id="lRate">– / hour</div></div>
+        <div class="kpi g"><div class="l">Yield</div><div class="v" id="lYield">0%</div><div class="s">good / inspected</div></div>
+        <div class="kpi b"><div class="l">Defects</div><div class="v" id="lBad">0</div><div class="s" id="lDr">0% defect rate</div></div>
+        <div class="kpi w"><div class="l">Uncertain</div><div class="v" id="lUnc">0</div><div class="s" id="lPend">0 to review</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="card"><h3>Recent inspections<span class="r hint">counted once per bag, when it lies still</span></h3><div class="strip" id="strip"></div></div>
+</section>
+
+<!-- ======================= PRODUCTION ======================= -->
+<section class="page" id="p-prod">
+  <div class="kpis">
+    <div class="kpi"><div class="l">Total bags inspected</div><div class="v" id="kTotal">0</div><div class="s" id="kSess">session</div></div>
+    <div class="kpi g"><div class="l">Good bags</div><div class="v" id="kGood">0</div><div class="s" id="kYield">yield 0%</div></div>
+    <div class="kpi b"><div class="l">Defect bags</div><div class="v" id="kBad">0</div><div class="s" id="kDr">0% · 0 ppm</div></div>
+    <div class="kpi w"><div class="l">Uncertain (not detected)</div><div class="v" id="kUnc">0</div><div class="s" id="kUncS">below 75% confidence</div></div>
+    <div class="kpi"><div class="l">Throughput</div><div class="v" id="kRate">0</div><div class="s">bags / hour</div></div>
+    <div class="kpi"><div class="l">Avg. confidence</div><div class="v" id="kConf">0%</div><div class="s">model certainty</div></div>
+    <div class="kpi b"><div class="l">Escaped defects</div><div class="v" id="kEsc">0</div><div class="s">BAD bags passed as GOOD (reviewed)</div></div>
+    <div class="kpi w"><div class="l">False rejects</div><div class="v" id="kFr">0</div><div class="s">GOOD bags rejected (reviewed)</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Output trend · last 2 hours<span class="r legend row"><div><i style="background:var(--good)"></i>good</div><div><i style="background:var(--bad)"></i>defect</div></span></h3>
+      <canvas id="trend" style="width:100%;height:260px;display:block"></canvas></div>
+    <div class="card"><h3>Quality</h3>
+      <div class="ringwrap"><canvas class="ring" id="ring" width="236" height="236"></canvas>
+        <div class="legend"><div><i style="background:var(--good)"></i><span id="rgG">0 good</span></div>
+          <div><i style="background:var(--bad)"></i><span id="rgB">0 defect</span></div>
+          <div><i style="background:var(--warn)"></i><span id="rgU">0 uncertain</span></div></div></div>
+      <h3 style="margin-top:18px">By bag place</h3><div id="perPlace"></div>
+      <div class="row" style="margin-top:14px"><a class="btn" href="export.csv">Export CSV</a><button onclick="resetKpi()">New shift (reset)</button></div>
+    </div>
+  </div>
+  <div class="card"><h3>Review queue · uncertain bags<span class="r hint">your answer is added to the training data</span></h3><div class="strip" id="review"></div></div>
+</section>
+
+<!-- ======================= ROBOTS ======================= -->
+<section class="page" id="p-robots">
+  <div class="robots" id="robotCards"></div>
+  <div class="grid2">
+    <div class="card"><h3>Production sequence · live status<span class="r hint" id="sqHead"></span></h3>
+      <div class="bigflow" id="bigflow"></div>
+      <div class="pbar" style="margin-bottom:14px"><i id="sqBar2"></i></div>
+      <h3>Cycle history</h3><div id="histTbl" class="hint">No cycles yet.</div></div>
+    <div class="card"><h3>Live camera</h3><div class="video"><img id="vidRobots" alt="live camera"></div>
+      <div class="row" style="margin-top:12px" id="sqBadges"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Start a sequence<span class="r hint">uArm → photo → Arm 1 → photo → Arm 2 (good / bad job) ∥ next uArm</span></h3>
+      <div class="ctl" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+        <label class="f">Cycles<input type="number" id="sqC" value="5" min="1"></label>
+        <label class="f">uArm job<select id="sqU"></select></label>
+        <label class="f">Arm 1 job<select id="sqA1"></select></label>
+        <label class="f">Arm 2 · GOOD bag<select id="sqA2"></select></label>
+        <label class="f">Arm 2 · BAD bag<select id="sqA2b"></select></label>
+        <label class="f">uArm speed<input type="number" id="sqUs" value="1" step="0.1" min="0.2"></label>
+        <label class="f">SO-100 speed<input type="number" id="sqSs" value="1" step="0.1" min="0.2"></label>
+        <label class="f">Bags in the stack (new)<input type="number" id="sqBags" value="20" min="1"></label>
+      </div>
+      <div class="row"><button class="pri big" onclick="seqStart('new')" title="refilled stack, fresh counts, starts at cycle 1">▶ New sequence</button>
+        <button class="big" onclick="seqStart('continue')" id="sqCont" title="same stack height, same counts, next cycle">⏯ Continue</button><button class="bad big" onclick="post('api/sequence/stop')">■ Stop</button></div>
+      <div style="margin-top:14px"><div class="row" style="justify-content:space-between;margin-bottom:6px"><b id="sqTxt">idle</b><span class="hint" id="sqCyc"></span></div>
+        <div class="pbar"><i id="sqBar"></i></div></div>
+    </div>
+    <div class="card"><h3>Sequence log &amp; alarms</h3><div class="log" id="sqLog"></div><div id="alarms" style="margin-top:10px"></div></div>
+  </div>
+</section>
+
+<!-- ======================= TEACH ======================= -->
+<section class="page" id="p-teach">
+  <div class="grid2">
+    <div class="card"><h3>Teach a job by hand</h3>
+      <div class="ctl">
+        <label class="f">Robot<select id="tRobot"><option value="arm1">SO-100 Arm 1</option><option value="arm2">SO-100 Arm 2</option><option value="buddy">SO-100 Buddy</option><option value="uarm">uArm (suction)</option></select></label>
+        <label class="f">Job number<input type="number" id="tJob" value="1" min="1"></label>
+        <label class="f" id="tModeWrap">Teach with<select id="tMode"><option value="hand">hand (arm goes limp)</option><option value="leader">leader arm (follower copies it)</option></select></label>
+        <label class="f" id="tStepWrap">Bags in the stack now<input type="number" id="tBags" value="20" min="1"></label>
+      </div>
+      <div class="steps" id="steps">
+        <div class="step" id="st1"><div class="num">1</div><div><b>Hold the arm, release the motors</b><p>The arm goes limp - keep a hand on it.</p>
+          <button class="warn big" id="btnRelease">Release motors</button></div></div>
+        <div class="step" id="st2"><div class="num">2</div><div><b>Move to the start and record</b><p>Position the arm where the job begins, then start recording and move it through the whole job.</p>
+          <button class="pri big" id="btnRec">● Start recording</button></div></div>
+        <div class="step" id="st3"><div class="num">3</div><div><b>Grab / release (optional)</b><p>uArm: suction on / off. SO-100: gripper close / open. Hold still when you click.</p>
+          <div class="row"><button class="good big" id="btnGrab">Grab</button><button class="bad big" id="btnRel">Release</button></div></div></div>
+        <div class="step" id="st4"><div class="num">4</div><div><b>Save the job</b><p>Hold the arm - the motors lock again when you save or cancel.</p>
+          <div class="row"><button class="pri big" id="btnSave">✓ Save job</button><button class="big" id="btnCancel">Cancel</button></div></div></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+      <div class="card"><h3>Live arm reading</h3>
+        <div id="tState" class="hint">No teaching session. Choose a robot and job, then press <b>Release motors</b>.</div>
+        <div class="readout" id="tPos"></div><div id="tRecInfo"></div></div>
+      <div class="card"><h3>Saved jobs</h3><div id="tJobs" class="hint"></div></div>
+      <div class="card"><h3>Tips</h3><div class="hint" style="line-height:1.7">• Move calmly - the robot repeats your exact speed.<br>• Pause briefly at important poses (they are measured on replay).<br>• Finish at a safe pose: that is the robot's "home" after the job.<br>• Teach Arm 2 separately, or convert Arm 1 jobs on the command line (copy-jobs).</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= DATASET ======================= -->
+<section class="page" id="p-data">
+  <div class="grid2">
+    <div class="card"><h3>Collect training photos<span class="r hint" id="dMsg"></span></h3>
+      <div class="video" id="dVideo"><img id="vidData" alt="camera"><canvas id="draw"></canvas><div class="ov"><span class="chip" id="drawHint" style="display:none">drag a box over the bag place, release to save</span></div></div>
+      <div class="row" style="margin-top:12px">
+        <button onclick="startDraw('1')">▭ Set place 1</button><button onclick="startDraw('2')">▭ Set place 2</button>
+        <button onclick="rmPlace()">✕ Remove a place</button>
+        <button onclick="if(confirm('Is the board EMPTY - no bag on it?')) post('api/dataset/empty',{force:true}).then(t)">Empty board (no bags)</button>
+        <span class="spacer"></span>
+        <button class="good big" onclick="cap('good')">GOOD photo <span class="hint">G</span></button>
+        <button class="bad big" onclick="cap('bad')">BAD photo <span class="hint">B</span></button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="autoG" onclick="auto('good')">Auto GOOD 1/s</button><button id="autoB" onclick="auto('bad')">Auto BAD 1/s</button><button id="autoE" onclick="auto('empty')">Auto EMPTY 1/s</button>
+        <button onclick="post('api/dataset/undo').then(t)">Undo last</button><span class="hint" id="dScores"></span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+      <div class="card"><h3>Detection model<span class="r hint" id="detInfo"></span></h3>
+        <div class="row"><button class="big" id="detCls" style="flex:1" onclick="setDet('classifier')">Classifier (YOLO)<br><span class="hint">trained on good + bad photos</span></button>
+          <button class="big" id="detAno" style="flex:1" onclick="setDet('anomaly')">Defect model<br><span class="hint">learns from good bags, heatmap</span></button></div></div>
+      <div class="card"><h3>Where the AI runs<span class="r hint" id="aiWhere"></span></h3>
+        <div class="hint" style="margin-bottom:10px">Robots and camera stay on this laptop. With an IPC address the bag inspection runs on the Siemens IPC (inspect_server.py); if it cannot be reached, this laptop takes over.</div>
+        <div class="row" style="flex-wrap:nowrap"><input id="aiUrl" placeholder="e.g. http://10.23.60.148:8100"><input id="aiTok" placeholder="token (optional)" style="max-width:150px"></div>
+        <div class="row" style="margin-top:10px"><button class="pri" style="flex:1" onclick="setAi(true)">Use IPC</button><button style="flex:1" onclick="setAi(false)">Use this laptop</button></div>
+        <div class="hint" id="aiInfo" style="margin-top:8px"></div></div>
+      <div class="card" style="border-color:rgba(56,189,248,.35)"><h3>Bag types · quick setup<span class="r hint" id="btActive"></span></h3>
+        <div class="hint" style="margin-bottom:10px">New bag colour / print? Put ONE good bag in a place, press Record and slowly slide &amp; turn it for 20 s. Front, then back. Then Build.</div>
+        <div class="row" style="flex-wrap:nowrap"><input id="btName" placeholder="name, e.g. black-bag"><button onclick="btStart()">Start</button></div>
+        <div class="row" style="margin-top:10px">
+          <button class="pri big" id="btFront" style="flex:1" onclick="btRec('front')">● Record FRONT</button>
+          <button class="pri big" id="btBack" style="flex:1" onclick="btRec('back')">● Record BACK</button></div>
+        <div class="row" style="margin-top:10px"><button class="good big" id="btBuild" style="flex:1" onclick="btBuild()">✓ Build &amp; use</button></div>
+        <div class="log" id="btLog" style="margin-top:10px;max-height:150px">No bag type being set up.</div>
+        <h3 style="margin-top:14px">Saved bag types</h3><div id="btList"></div></div>
+      <div class="card"><h3>Dataset</h3><div class="classes" id="classes"></div>
+        <div class="hint" style="margin-top:10px">Target: 100+ good and 100+ bad from many different bags, both places, both sides.</div></div>
+      <div class="card"><h3>Train the AI model<span class="r hint" id="mInfo"></span></h3>
+        <div class="ctl"><label class="f">Epochs<input type="number" id="ep" value="50" min="5"></label>
+          <label class="f">Model size<select id="msz"><option value="yolo11n-cls.pt">Nano · fastest</option><option value="yolo11s-cls.pt" selected>Small · balanced</option><option value="yolo11m-cls.pt">Medium · most accurate</option></select></label>
+          <label class="f">&nbsp;<button class="pri" id="btnTrain" onclick="train()">Train on GPU</button></label></div>
+        <div id="trRes" style="margin:6px 0 10px;font-weight:600"></div>
+        <div class="log" id="trLog">No training yet.</div></div>
+    </div>
+  </div>
+</section>
+</main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let S = null, page = 'live', drawing = null;
+const titles = {live:['Live Inspection','Real-time bag quality check · D435 + YOLO11'],
+  prod:['Production','Shift KPIs, trends and the review queue'], robots:['Robots','uArm + two SO-100 arms · jobs and the production sequence'],
+  teach:['Teach','Record a robot job by moving the arm by hand'], data:['Dataset & AI','Collect labelled photos and train the inspection model']};
+
+/* ---------- helpers ---------- */
+function t(r){ toast(r && r.msg ? r.msg : r); }
+function toast(m){ if(!m) return; const e=$('toast'); e.textContent=m; e.classList.add('show'); clearTimeout(e._t); e._t=setTimeout(()=>e.classList.remove('show'),2600); }
+async function post(url, body){ const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return r.json(); }
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- navigation ---------- */
+document.querySelectorAll('.navbtn').forEach(b => b.onclick = () => show(b.dataset.p));
+function show(p){
+  page = p;
+  document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  document.querySelectorAll('.page').forEach(s => s.classList.toggle('on', s.id === 'p-' + p));
+  $('title').textContent = titles[p][0]; $('subtitle').textContent = titles[p][1];
+  connectVideo();
+  render();
+}
+/* video: reconnect automatically after a server restart or a dropped connection */
+function connectVideo(){ const u = 'video?t=' + Date.now();
+  $('vidLive').src = page === 'live' ? u : ''; $('vidData').src = page === 'data' ? u : ''; $('vidRobots').src = page === 'robots' ? u : ''; }
+['vidLive','vidData','vidRobots'].forEach(id => $(id).onerror = () => setTimeout(() => { if ($(id).getAttribute('src')) connectVideo(); }, 1500));
+let boot = null, pollFailed = false;
+show(titles[location.hash.slice(1)] ? location.hash.slice(1) : 'live');
+$('estop').onclick = () => post('api/estop').then(r => toast('E-STOP: all robots stopping'));
+
+/* ---------- polling ---------- */
+async function poll(){
+  try{ S = await (await fetch('api/state')).json();
+    if ((boot && S.boot !== boot) || pollFailed) connectVideo();      // server restarted / came back
+    boot = S.boot; pollFailed = false; render();
+  }catch(e){ pollFailed = true; }
+}
+setInterval(poll, 700); poll();
+
+function render(){
+  if(!S) return;
+  $('clock').textContent = S.time; $('date').textContent = S.date;
+  const v = S.vision, k = S.kpi;
+  const cls = S.detector === 'classifier';
+  $('lvCls').classList.toggle('pri', cls); $('lvAno').classList.toggle('pri', !cls);
+  $('fps').textContent = v.fps + ' fps'; $('chipFps').textContent = v.camera ? 'CAMERA: ' + v.camera : v.fps + ' fps';
+  $('chipFps').style.background = v.camera ? 'var(--bad)' : '';
+  $('ledCam').className = 'led ' + (v.fps > 1 ? 'ok' : 'bad');
+  $('ledModel').className = 'led ' + (v.model ? 'ok' : 'bad'); $('modelTxt').textContent = v.model ? 'loaded' : 'not trained';
+  for (const [key, r] of Object.entries(S.robots)) $('led_' + key).className = 'led ' + (!r.connected ? 'bad' : r.busy ? 'busy' : 'ok');
+  $('revBadge').textContent = k.pending_review; $('revBadge').style.display = k.pending_review ? 'inline-block' : 'none';
+  if (document.activeElement !== $('thr')) { $('thr').value = v.threshold; $('thrV').textContent = (+v.threshold).toFixed(2); }
+  renderStatusBar();
+  if (page === 'live') renderLive(); else if (page === 'prod') renderProd();
+  else if (page === 'robots') renderRobots(); else if (page === 'teach') renderTeach(); else renderData();
+}
+
+/* ---------- live ---------- */
+function placeCards(){
+  const pl = S.vision.places; const keys = Object.keys(pl).sort();
+  if (!keys.length) return '<div class="none" style="grid-column:1/-1">No bag places yet - set them in Dataset &amp; AI.</div>';
+  const thr = S.vision.anom_threshold;
+  return keys.map(n => { const p = pl[n];
+    const an = (thr && p.anom != null) ? `<div class="anom">defect score ${p.anom} / limit ${thr}
+      <div class="bar"><i style="width:${Math.min(100, 100 * p.anom / (thr * 1.5))}%;background:${p.anom > thr ? 'var(--bad)' : p.anom > 0.92 * thr ? 'var(--warn)' : 'var(--good)'}"></i></div></div>` : '';
+    const sub = !S.vision.model ? 'no AI model yet' : p.result === 'EMPTY' ? 'no bag' : p.result === 'CHECK' ? 'not sure - goes to review' : p.conf + '% confident';
+    return `<div class="place ${p.result}"><div class="n">Place ${n}</div><div class="v">${S.vision.model ? p.result : '—'}</div>
+    <div class="c">${sub}</div>${an}</div>`; }).join('');
+}
+function evCard(e, review){
+  const u = e.uncertain ? '<span class="tag U">UNSURE</span>' : '';
+  const btns = review ? `<div class="row" style="margin-top:6px;gap:6px"><button class="good" style="padding:5px 10px" onclick="rev(${e.id},'good')">Good</button><button class="bad" style="padding:5px 10px" onclick="rev(${e.id},'bad')">Bad</button></div>` : '';
+  const rv = e.review ? `<div>reviewed: <b>${e.review}</b></div>` : '';
+  return `<div class="ev"><img src="thumb/${e.id}" loading="lazy" alt=""><div class="m"><span class="tag ${e.result}">${e.result}</span> ${u}
+    <div style="margin-top:4px">${Math.round(e.conf*100)}% · place ${esc(e.place)}</div><div>#${e.id} · ${e.time}</div>${rv}${btns}</div></div>`;
+}
+function renderLive(){
+  const k = S.kpi;
+  $('liveType').textContent = S.detector === 'classifier' ? 'model: classifier (YOLO)' : 'model: defect model · ' + (S.bagtype.active || 'default (brown bags)');
+  $('placesLive').innerHTML = placeCards();
+  $('lTotal').textContent = k.total; $('lRate').textContent = k.per_hour + ' / hour';
+  $('lYield').textContent = k.yield + '%'; $('lBad').textContent = k.bad; $('lDr').textContent = k.defect_rate + '% defect rate';
+  $('lUnc').textContent = k.uncertain; $('lPend').textContent = k.pending_review + ' to review';
+  $('strip').innerHTML = S.events.length ? S.events.map(e => evCard(e)).join('') : '<div class="none" style="grid-column:1/-1">No bags inspected yet - place a bag in a marked place.</div>';
+}
+$('thr').oninput = e => $('thrV').textContent = (+e.target.value).toFixed(2);
+$('thr').onchange = e => post('api/threshold', {value: +e.target.value}).then(() => toast('threshold set to ' + (+e.target.value).toFixed(2)));
+function snap(){ post('api/snapshot').then(r => toast('saved ' + r.msg)); }
+
+/* ---------- production ---------- */
+function renderProd(){
+  const k = S.kpi;
+  $('kTotal').textContent = k.total; $('kSess').textContent = `session ${k.session_min} min`;
+  $('kGood').textContent = k.good; $('kYield').textContent = `yield ${k.yield}%`;
+  $('kBad').textContent = k.bad; $('kDr').textContent = `${k.defect_rate}% · ${k.ppm.toLocaleString()} ppm`;
+  $('kUnc').textContent = k.uncertain; $('kUncS').textContent = `${k.pending_review} waiting for review`;
+  $('kRate').textContent = k.per_hour; $('kConf').textContent = k.avg_conf + '%';
+  $('kEsc').textContent = k.escapes; $('kFr').textContent = k.false_rejects;
+  drawTrend(k.trend); drawRing(k);
+  const pp = Object.entries(k.per_place).sort();
+  $('perPlace').innerHTML = pp.length ? pp.map(([n, c]) => { const tot = c.good + c.bad || 1;
+    return `<div class="jt" style="grid-template-columns:70px 1fr 90px;margin:7px 0"><span>Place ${esc(n)}</span>
+    <div class="bar" style="height:10px;display:flex"><i style="width:${100*c.good/tot}%;background:var(--good)"></i><i style="width:${100*c.bad/tot}%;background:var(--bad)"></i></div>
+    <span>${c.good} / <span style="color:var(--bad)">${c.bad}</span></span></div>`; }).join('') : '<div class="hint">no data yet</div>';
+  $('review').innerHTML = S.review.length ? S.review.map(e => evCard(Object.assign({uncertain:true}, e), true)).join('') : '<div class="none" style="grid-column:1/-1">Nothing to review - every bag was classified with high confidence.</div>';
+}
+function rev(id, label){ post('api/review', {id, label}).then(() => { toast('thanks - added to the training data as ' + label.toUpperCase()); poll(); }); }
+function resetKpi(){ if (confirm('Start a new shift? Counters reset (today\'s data is archived).')) post('api/kpi/reset').then(poll); }
+function canvasCtx(c){ const r = c.getBoundingClientRect(), d = devicePixelRatio || 1; c.width = r.width * d; c.height = r.height * d;
+  const x = c.getContext('2d'); x.scale(d, d); return [x, r.width, r.height]; }
+function drawTrend(tr){
+  const [x, w, h] = canvasCtx($('trend')); const pad = 34, bw = (w - pad - 10) / tr.length;
+  const max = Math.max(4, ...tr.map(b => b.good + b.bad));
+  x.strokeStyle = '#1e2736'; x.fillStyle = '#5d6780'; x.font = '11px system-ui'; x.lineWidth = 1;
+  for (let i = 0; i <= 4; i++){ const y = 10 + (h - 40) * i / 4; x.beginPath(); x.moveTo(pad, y); x.lineTo(w - 6, y); x.stroke();
+    x.fillText(Math.round(max * (1 - i / 4)), 4, y + 4); }
+  tr.forEach((b, i) => { const X = pad + i * bw + bw * 0.18, W = bw * 0.64, H = h - 40;
+    const gh = H * b.good / max, bh = H * b.bad / max, base = 10 + H;
+    const g1 = x.createLinearGradient(0, base - gh, 0, base); g1.addColorStop(0, '#4ade80'); g1.addColorStop(1, '#15803d');
+    x.fillStyle = g1; x.fillRect(X, base - gh, W, gh);
+    x.fillStyle = '#ef4444'; x.fillRect(X, base - gh - bh, W, bh);
+    if (i % 2 === 1 || tr.length < 8){ x.fillStyle = '#5d6780'; x.fillText(b.label, X - 4, h - 12); } });
+}
+function drawRing(k){
+  const c = $('ring'), x = c.getContext('2d'), W = c.width, cx = W / 2, r = W / 2 - 16;
+  x.clearRect(0, 0, W, W); x.lineWidth = 22; x.lineCap = 'round';
+  x.strokeStyle = '#1a2230'; x.beginPath(); x.arc(cx, cx, r, 0, 2 * Math.PI); x.stroke();
+  const tot = k.total || 0; let a = -Math.PI / 2;
+  [[k.good, '#22c55e'], [k.bad, '#ef4444']].forEach(([n, col]) => { if (!tot || !n) return; const e = a + 2 * Math.PI * n / tot;
+    x.strokeStyle = col; x.beginPath(); x.arc(cx, cx, r, a + 0.03, e - 0.03); x.stroke(); a = e; });
+  x.fillStyle = '#e6ebf4'; x.font = '800 40px system-ui'; x.textAlign = 'center'; x.fillText((tot ? k.yield : 0) + '%', cx, cx + 8);
+  x.fillStyle = '#8792a8'; x.font = '600 16px system-ui'; x.fillText('YIELD', cx, cx + 34);
+  $('rgG').textContent = k.good + ' good'; $('rgB').textContent = k.bad + ' defect'; $('rgU').textContent = k.uncertain + ' uncertain';
+}
+
+/* ---------- status bar + flow ---------- */
+const STEP_INFO = {uarm: ['🦾', 'uArm', 'picks a bag'], photo1: ['📷', 'Camera', 'checks the bag'], arm1: ['🤖', 'Arm 1', 'job'],
+  photo2: ['📷', 'Camera', 'checks again'], arm2: ['🤖', 'Arm 2', 'good / bad job']};
+const RNAME = {uarm: 'uArm', arm1: 'Arm 1', arm2: 'Arm 2', buddy: 'Buddy', camera: 'Camera'};
+function stepStates(q){
+  const st = Object.assign({}, (q.flow && q.flow.steps) || {}); const keys = Object.keys(STEP_INFO);
+  if (q.running){ const a = keys.findIndex(k => st[k] === 'active'); const nx = keys.findIndex((k, i) => i > a && st[k] !== 'done');
+    if (a >= 0 && nx >= 0) st[keys[nx]] = 'next'; }
+  return st;
+}
+function verdictTag(v){ return v ? `<span class="tag ${v === 'GOOD' ? 'GOOD' : (v === 'EMPTY' || v === 'MISSED') ? 'U' : v === 'CHECK' ? 'U' : 'BAD'}">${v}</span>` : '<span class="hint">–</span>'; }
+function renderStatusBar(){
+  const q = S.seq, st = stepStates(q), keys = Object.keys(STEP_INFO);
+  const last = (q.history || []).find(h => h.final);
+  const mm = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const head = q.running ? `<div class="st run"><i></i>RUNNING · cycle ${q.flow.cycle || q.cycle} / ${q.cycles} · ${mm(q.elapsed || 0)}</div>`
+    : `<div class="st"><i></i>SEQUENCE IDLE</div>`;
+  const flow = q.running ? `<div class="flow">${keys.map((k, i) => `${i ? '<span class="arrow">→</span>' : ''}<span class="fs ${st[k] || ''}">${STEP_INFO[k][1]}${k.startsWith('photo') ? ' ' + (k === 'photo1' ? '1' : '2') : ''}</span>`).join('')}</div>` : '';
+  const chips = ['uarm', 'arm1', 'arm2', 'camera'].map(k => { const r = (q.robots || {})[k] || {}; const rob = S.robots[k];
+    const state = k !== 'camera' && rob && !rob.connected ? 'offline' : (q.running ? r.state || 'idle' : (rob && rob.busy ? 'working' : 'idle'));
+    return `<div class="rchip ${state}"><b>${RNAME[k]}</b><span>${state}${q.running && r.task ? ' · ' + esc(r.task) : ''}</span></div>`; }).join('');
+  const bag = last ? `<div class="rchip"><b>Last bag</b>${verdictTag(last.final)}<span>cycle ${last.cycle} → ${last.job2 ? 'Arm 2 job ' + last.job2 : 'no bag picked, arms skipped'}</span></div>` : '';
+  const sorted = q.running || (q.history || []).length ? `<div class="rchip"><b>Sorted</b><span style="color:var(--good)">${q.sorted.GOOD} good</span><span style="color:var(--bad)">${q.sorted.BAD} bad</span>${q.sorted.MISSED ? `<span style="color:var(--warn)">${q.sorted.MISSED} missed</span>` : ''}</div>` : '';
+  $('sbar').innerHTML = head + flow + chips + bag + sorted;
+}
+function renderFlowPanel(){
+  const q = S.seq, st = stepStates(q), keys = Object.keys(STEP_INFO); const cur = (q.history || []).find(h => h.cycle === (q.flow || {}).cycle) || {};
+  const sub = {uarm: (q.robots.uarm || {}).task, photo1: cur.v1, arm1: (q.robots.arm1 || {}).task, photo2: cur.v2,
+               arm2: cur.final ? `${cur.final} bag → job ${cur.job2}` : ''};
+  $('bigflow').innerHTML = keys.map(k => `<div class="bf ${st[k] || ''}"><div class="ic">${STEP_INFO[k][0]}</div><b>${STEP_INFO[k][1]}</b>
+    <small>${esc(sub[k] && (k.startsWith('photo') ? sub[k] : sub[k].replace(/^cycle \d+ · /, '')) || STEP_INFO[k][2])}</small></div>`).join('');
+  $('sqHead').textContent = q.running ? `cycle ${(q.flow || {}).cycle} of ${q.cycles}` : 'idle';
+  $('sqBar2').style.width = q.cycles ? (100 * (q.history || []).filter(h => h.state === 'done').length / q.cycles) + '%' : '0';
+  const h = q.history || [];
+  $('histTbl').innerHTML = h.length ? `<table class="hist"><tr><th>Cycle</th><th>Start</th><th>After uArm</th><th>After Arm 1</th><th>Bag</th><th>Arm 2</th><th>Time</th></tr>
+    ${h.map(r => `<tr><td><b>${r.cycle}</b></td><td>${r.start}</td><td>${verdictTag(r.v1)}</td><td>${verdictTag(r.v2)}</td><td>${verdictTag(r.final)}</td>
+      <td>${r.job2 ? 'job ' + r.job2 : '–'}</td><td>${r.state === 'done' ? r.secs + ' s' : '<span class="rec"><i></i>running</span>'}</td></tr>`).join('')}</table>` : 'No cycles yet.';
+  $('sqBadges').innerHTML = `<div class="rchip"><b>Good bags</b><span style="color:var(--good)">${q.sorted.GOOD} → job ${$('sqA2').value || 3}</span></div>
+    <div class="rchip"><b>Bad bags</b><span style="color:var(--bad)">${q.sorted.BAD} → job ${$('sqA2b').value || 4}</span></div>`;
+}
+
+/* ---------- robots ---------- */
+const JN = ['pan','lift','elbow','wrist','roll','gripper'];
+let robotInputs = {};
+function renderRobots(){
+  const cards = $('robotCards');
+  if (!cards.children.length) cards.innerHTML = Object.values(S.robots).map(r => `<div class="card rb" id="rb_${r.key}"></div>`).join('');
+  for (const r of Object.values(S.robots)){
+    const el = $('rb_' + r.key); const focus = el.contains(document.activeElement);
+    if (focus) { updateRobotLive(r); continue; }
+    const jobs = r.jobs.map(j => `<option value="${j.job}">${jobLabel(j)} · ${esc(j.info)}</option>`).join('') || '<option value="">no jobs taught</option>';
+    const prev = robotInputs[r.key] || {};
+    el.innerHTML = `<div class="hd"><b>${esc(r.title)}</b><span class="pill ${!r.connected ? 'off' : r.busy ? 'busy' : 'ok'}" id="pl_${r.key}">${!r.connected ? 'OFFLINE' : r.busy ? esc(r.busy).toUpperCase() : 'READY'}</span>
+        <span class="spacer"></span>${r.connected ? '' : `<button onclick="post('api/connect',{robot:'${r.key}'}).then(t)">Connect</button>`}</div>
+      <div id="tl_${r.key}"></div>
+      <div class="ctl"><label class="f">Job<select id="j_${r.key}">${jobs}</select></label>
+        <label class="f">Runs<input type="number" id="c_${r.key}" value="${prev.c || 1}" min="1"></label>
+        <label class="f">Speed<input type="number" id="s_${r.key}" value="${prev.s || 1}" step="0.1" min="0.2"></label></div>
+      ${r.jobs.length ? `<div class="row" style="margin-bottom:10px"><button onclick="renameJob('${r.key}')">✎ Rename job</button></div>` : ''}
+      ${r.kind === 'uarm' ? `<div class="row hint" style="margin-bottom:10px"><label style="display:flex;gap:8px;align-items:center;cursor:pointer">
+        <input type="checkbox" id="tc_${r.key}" style="width:auto" onchange="setTouch(this.checked)"> Touch-down pick: find the stack height with the cup switch</label></div>
+        <div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><span class="hint" style="white-space:nowrap">Bags in stack</span>
+        <input type="number" id="bg_${r.key}" style="width:80px" min="0" placeholder="e.g. 20"><button onclick="setBags()">Set</button>
+        <b id="bl_${r.key}" class="hint" style="white-space:nowrap"></b></div>
+        <div class="row hint" style="margin-bottom:10px">Stack (without touch-down): sheets already taken
+        <input type="number" id="st_${r.key}" style="width:70px" value="0" min="0"><button onclick="setStack()">Set</button></div>` : ''}
+      <div class="row"><button class="pri" onclick="runJob('${r.key}')" ${!r.connected || r.busy ? 'disabled' : ''}>▶ Run</button>
+        <button class="bad" onclick="post('api/stop',{robot:'${r.key}'}).then(t)">■ Stop</button>
+        <button onclick="post('api/home',{robot:'${r.key}'}).then(t)" ${!r.connected || r.busy ? 'disabled' : ''}>${r.kind === 'uarm' ? '⌂ Home' : '⌂ Park'}</button></div>
+      <div class="prog" id="pg_${r.key}"></div><div class="err" id="er_${r.key}"></div>`;
+    if (prev.j) $('j_' + r.key).value = prev.j;
+    if (r.kind === 'uarm') { const sync = () => { const jb = r.jobs.find(j => j.job == $('j_uarm').value); $('tc_uarm').checked = !!(jb && jb.touch); };
+      sync(); $('j_uarm').addEventListener('change', sync); }
+    ['j','c','s'].forEach(f => { const inp = $(f + '_' + r.key); inp.onchange = () => { robotInputs[r.key] = Object.assign(robotInputs[r.key] || {}, {[f]: inp.value}); }; });
+    updateRobotLive(r);
+  }
+  // sequence
+  const opt = key => S.robots[key].jobs.map(j => `<option value="${j.job}">${jobLabel(j)}</option>`).join('');
+  [['sqU','uarm'],['sqA1','arm1'],['sqA2','arm2'],['sqA2b','arm2']].forEach(([id, key]) => { const e = $(id); if (document.activeElement !== e) { const v = e.value; e.innerHTML = opt(key); if (v) e.value = v; } });
+  if (!$('sqA2').dataset.init && S.robots.arm2.jobs.some(j => j.job == 3)) { $('sqA2').value = 3; $('sqA2').dataset.init = 1; }
+  if (!$('sqA2b').dataset.init && S.robots.arm2.jobs.some(j => j.job == 4)) { $('sqA2b').value = 4; $('sqA2b').dataset.init = 1; }
+  const q = S.seq; $('sqTxt').textContent = q.running ? q.step : (q.step || 'idle');
+  const L = q.last;
+  $('sqCont').textContent = L ? (L.done < L.total ? `⏯ Continue at cycle ${L.done + 1} of ${L.total}` : `⏯ Continue (+cycles, from ${L.done + 1})`) : '⏯ Continue';
+  $('sqCont').disabled = !L || q.running;
+  $('sqCyc').textContent = q.cycles ? `cycle ${q.cycle} / ${q.cycles} · sorted: ${q.sorted.GOOD} good, ${q.sorted.BAD} bad` : ''; $('sqBar').style.width = q.cycles ? (100 * q.cycle / q.cycles) + '%' : '0';
+  $('sqLog').textContent = q.log.join('\n') || 'Sequence not started.';
+  $('alarms').innerHTML = S.alarms.map(a => `<div class="alarm">⚠ ${esc(a)}</div>`).join('');
+  renderFlowPanel();
+}
+function updateRobotLive(r){
+  const tl = $('tl_' + r.key), s = r.status || {};
+  if (!r.connected) tl.innerHTML = `<div class="hint" style="margin-bottom:12px">${esc(r.error) || 'not connected'}</div>`;
+  else if (r.kind === 'uarm') tl.innerHTML = `<div class="tele">${(s.pos || [0,0,0]).map((v, i) => `<div><small>${'XYZ'[i]} mm</small><b>${(+v).toFixed(1)}</b></div>`).join('')}</div>
+      <div class="tele"><div><small>Cup touch switch</small><b style="color:${s.switch ? 'var(--good)' : 'inherit'}">${s.switch ? 'PRESSED' : 'not pressed'}</b></div>
+      <div><small>Pump</small><b>${s.pump ? 'ON' : 'off'}</b></div><div></div></div>`;
+  else tl.innerHTML = `<div class="tele"><div><small>Supply</small><b>${s.volt ?? '–'} V</b></div><div><small>Max temp</small><b style="color:${s.temp > 55 ? 'var(--bad)' : 'inherit'}">${s.temp ?? '–'} °C</b></div>
+      <div><small>Motors</small><b>${s.torque ? 'ON' : 'off'}</b></div></div><div class="joints">${(s.joints || []).map((v, i) => `<div class="jt"><span>${JN[i]}</span>
+      <div class="bar"><i style="width:${Math.max(0, Math.min(100, v / 40.95))}%"></i></div><span>${v}</span></div>`).join('')}</div>`;
+  if (r.kind === 'uarm' && $('bl_uarm') && $('j_uarm')) { const jb = r.jobs.find(j => j.job == $('j_uarm').value);
+    $('bl_uarm').textContent = jb && jb.bags_left != null ? `${jb.bags_left} left` : 'count not set (touch only)'; }
+  $('pg_' + r.key).textContent = r.progress || ''; $('er_' + r.key).textContent = r.error && r.connected ? r.error : '';
+  const pl = $('pl_' + r.key); if (pl){ pl.className = 'pill ' + (!r.connected ? 'off' : r.busy ? 'busy' : 'ok'); pl.textContent = !r.connected ? 'OFFLINE' : r.busy ? r.busy.toUpperCase() : 'READY'; }
+}
+function runJob(key){ const j = $('j_' + key).value; if (!j) return toast('no job selected');
+  post('api/run', {robot: key, job: +j, count: +$('c_' + key).value, speed: +$('s_' + key).value}).then(t); }
+function setBags(){ const n = $('bg_uarm').value; if (n === '') return toast('type how many bags are in the stack');
+  post('api/uarm/bags', {job: +$('j_uarm').value, count: +n}).then(t); }
+function setTouch(on){ post('api/uarm/touch', {job: +$('j_uarm').value, on}).then(t); }
+function setStack(){ post('api/stack', {job: +$('j_uarm').value, taken: +$('st_uarm').value}).then(() => toast('stack position set')); }
+function setAi(on){ post('api/ai', on ? {url: $('aiUrl').value.trim(), token: $('aiTok').value.trim()} : {url: ''}).then(t); }
+function jobLabel(j){ return `Job ${j.job}` + (j.name ? ` "${esc(j.name)}"` : ''); }
+function renameJob(key){ const job = +$('j_' + key).value; const j = S.robots[key].jobs.find(x => x.job == job);
+  const name = prompt(`Name for job ${job} (empty = no name):`, (j && j.name) || ''); if (name === null) return;
+  post('api/job/rename', {robot: key, job, name}).then(t); }
+function seqStart(mode){ post('api/sequence/start', {mode, bags: +$('sqBags').value, cycles: +$('sqC').value, ujob: +$('sqU').value,
+  a1job: +$('sqA1').value, a2job: +$('sqA2').value, a2bad: +$('sqA2b').value, uspeed: +$('sqUs').value, sspeed: +$('sqSs').value}).then(t); }
+
+/* ---------- teach ---------- */
+$('tRobot').onchange = () => { const u = $('tRobot').value === 'uarm';
+  $('tStepWrap').style.display = u ? '' : 'none'; $('tModeWrap').style.display = u ? 'none' : ''; };
+$('tStepWrap').style.display = 'none';
+$('btnRelease').onclick = () => { const lead = $('tRobot').value !== 'uarm' && $('tMode').value === 'leader';
+  if (confirm(lead ? 'Put the LEADER arm in roughly the same pose as the follower. The follower then moves SLOWLY to the leader pose and copies it. Ready?'
+                   : 'HOLD THE ARM with one hand - it goes limp now. Ready?'))
+    post('api/teach/start', {robot: $('tRobot').value, job: +$('tJob').value, leader: lead}).then(t); };
+$('btnRec').onclick = () => post('api/teach/record').then(t);
+$('btnGrab').onclick = () => post('api/teach/event', {kind: 'grab'}).then(t);
+$('btnRel').onclick = () => post('api/teach/event', {kind: 'release'}).then(t);
+$('btnSave').onclick = () => { if (confirm('Hold the arm - motors lock now. Save the job?'))
+  post('api/teach/finish', {save: true, pick_bags: $('tRobot').value === 'uarm' ? +$('tBags').value : null}).then(t); };
+$('btnCancel').onclick = () => { if (confirm('Hold the arm - motors lock now. Discard this recording?')) post('api/teach/finish', {save: false}).then(t); };
+function renderTeach(){
+  const s = S.teach; const step = !s ? 1 : !s.recording ? 2 : 3;
+  ['st1','st2','st3','st4'].forEach((id, i) => { const n = i + 1, e = $(id);
+    e.className = 'step ' + (n === step || (step === 3 && n === 4) ? 'act' : n < step ? 'done' : ''); });
+  $('btnRelease').disabled = !!s; $('btnRec').disabled = !s; $('btnGrab').disabled = $('btnRel').disabled = !(s && s.recording);
+  $('btnSave').disabled = !(s && s.recording); $('btnCancel').disabled = !s;
+  $('tRobot').disabled = $('tJob').disabled = $('tMode').disabled = !!s;
+  $('btnRelease').textContent = $('tRobot').value !== 'uarm' && $('tMode').value === 'leader' ? 'Start following the leader' : 'Release motors';
+  if (!s){ $('tState').innerHTML = 'No teaching session. Choose a robot and job, then press <b>Release motors</b>.'; $('tPos').textContent = ''; $('tRecInfo').innerHTML = ''; }
+  else {
+    $('tState').innerHTML = `<b>${esc(S.robots[s.robot].title)}</b> · job ${s.job} · ` + (s.leader
+      ? (s.following ? `<b style="color:var(--good)">FOLLOWING</b> the leader arm - move the leader` : `moving slowly to the leader's pose …`)
+      : `arm is <b style="color:var(--warn)">LIMP</b>`);
+    $('tPos').textContent = s.robot === 'uarm' ? (s.pos.length ? `X ${s.pos[0]}  Y ${s.pos[1]}  Z ${s.pos[2]}` : '…') : s.pos.map(v => Math.round(v)).join('  ');
+    $('tRecInfo').innerHTML = s.recording ? `<span class="rec"><i></i>REC ${s.seconds.toFixed(1)} s</span> <span class="hint">· ${s.samples} samples · ${s.events.join(', ') || 'no grab/release'}</span>` : '<span class="hint">ready - press Start recording</span>';
+  }
+  const r = S.robots[$('tRobot').value];
+  $('tJobs').innerHTML = r.jobs.length ? r.jobs.map(j => `<div class="alarm" style="color:var(--text)">${jobLabel(j)} · ${esc(j.info)} <span class="hint">· ${esc(j.taught)}</span></div>`).join('') : (r.connected ? 'no jobs yet' : 'robot not connected');
+}
+
+/* ---------- dataset ---------- */
+function cap(label){ post('api/dataset/capture', {label}).then(t); }
+function auto(label){ const on = S && S.dataset.auto === label; post('api/dataset/auto', {label: on ? null : label}).then(() => toast(on ? 'auto off' : 'auto ' + label.toUpperCase() + ' on - turn / move the bag')); }
+function train(){ post('api/train', {epochs: +$('ep').value, model: $('msz').value}).then(t); }
+document.addEventListener('keydown', e => { if (page !== 'data' || e.target.tagName === 'INPUT') return;
+  if (e.key === 'g') cap('good'); if (e.key === 'b') cap('bad'); });
+function renderData(){
+  const d = S.dataset, tr = S.train;
+  const tgt = 100, cls = [['good','var(--good)'],['bad','var(--bad)'],['empty','var(--empty)']];
+  $('classes').innerHTML = cls.map(([c, col]) => `<div class="kpi cls"><div class="l">${c}</div><div class="v" style="color:${col}">${d.counts[c]}</div>
+    <div class="bar" style="margin-top:8px"><i style="width:${Math.min(100, 100 * d.counts[c] / tgt)}%;background:${col}"></i></div></div>`).join('');
+  $('dMsg').textContent = d.msg || '';
+  const sc = Object.entries(d.scores).sort();
+  $('dScores').textContent = !Object.keys(d.areas).length ? 'step 1: set the two bag places' : !d.empty_set ? 'step 2: take all bags off, press "Empty board"'
+    : 'difference from empty board: ' + sc.map(([n, v]) => `place ${n} ${v}`).join(' · ');
+  $('autoG').classList.toggle('on', d.auto === 'good'); $('autoB').classList.toggle('on', d.auto === 'bad'); $('autoE').classList.toggle('on', d.auto === 'empty');
+  $('btnTrain').disabled = tr.running; $('btnTrain').textContent = tr.running ? 'Training…' : 'Train on GPU';
+  $('mInfo').textContent = tr.model ? 'model from ' + tr.model_time : 'no model yet';
+  $('trRes').innerHTML = tr.running ? '<span class="rec"><i></i>training on the GPU…</span>' : esc(tr.result);
+  if (tr.log.length) { const L = $('trLog'); L.textContent = tr.log.join('\n'); L.scrollTop = L.scrollHeight; }
+  drawAreas(); renderBagTypes();
+  $('detCls').classList.toggle('on', S.detector === 'classifier'); $('detAno').classList.toggle('on', S.detector !== 'classifier');
+  $('detCls').classList.toggle('pri', S.detector === 'classifier'); $('detAno').classList.toggle('pri', S.detector !== 'classifier');
+  const ai = S.vision.ai || {where: 'laptop'};
+  $('aiWhere').textContent = ai.where;
+  $('aiWhere').style.color = ai.where === 'IPC' ? 'var(--good)' : ai.url ? 'var(--warn)' : '';
+  $('aiInfo').textContent = ai.url ? (ai.ok ? `${ai.url} · ${ai.device || ''} · ${ai.ms ?? '–'} ms per picture` : (ai.syncing || 'not reachable: ' + ai.error)) : '';
+  if (ai.url && document.activeElement !== $('aiUrl') && !$('aiUrl').value) $('aiUrl').value = ai.url;
+  $('detInfo').textContent = S.detector === 'classifier' ? 'classifier from ' + S.train.model_time : 'defect model: ' + (S.bagtype.active || 'default (brown bags)');
+}
+function renderBagTypes(){
+  const b = S.bagtype;
+  $('btActive').textContent = 'now checking: ' + (b.active || 'default (brown bags)');
+  const rec = b.side, building = b.building;
+  $('btFront').textContent = rec === 'front' ? `● REC FRONT ${b.left}s` : `● Record FRONT${b.name ? ' (' + b.front + ')' : ''}`;
+  $('btBack').textContent = rec === 'back' ? `● REC BACK ${b.left}s` : `● Record BACK${b.name ? ' (' + b.back + ')' : ''}`;
+  $('btFront').classList.toggle('bad', rec === 'front'); $('btBack').classList.toggle('bad', rec === 'back');
+  $('btFront').disabled = $('btBack').disabled = !b.name || !!rec || building;
+  $('btBuild').disabled = !b.name || !!rec || building || b.front < 15 || b.back < 15;
+  $('btBuild').textContent = building ? 'Building… (about 2 min)' : '✓ Build & use';
+  if (b.log) { const L = $('btLog'); L.textContent = b.log.join('\n'); L.scrollTop = L.scrollHeight; }
+  const items = [`<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)"><span>default (brown bags)</span>${!b.active ? '<span class="pill ok">IN USE</span>' : b.has_default ? `<button onclick="btUse('')">Use</button>` : ''}</div>`]
+    .concat(b.profiles.map(p => `<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)">
+      <span><b>${esc(p.name)}</b> <span class="hint">· ${p.front}+${p.back} photos · limit ${p.threshold} · ${esc(p.created)}</span></span>
+      ${b.active === p.name ? '<span class="pill ok">IN USE</span>' : `<button onclick="btUse('${esc(p.name)}')">Use</button>`}</div>`));
+  $('btList').innerHTML = items.join('');
+}
+function setDet(mode){ post('api/detector', {mode}).then(t); }
+function btStart(){ post('api/enroll/start', {name: $('btName').value}).then(t); }
+function btRec(side){ post('api/enroll/record', {side}).then(t); }
+function btBuild(){ post('api/enroll/build').then(t); }
+function btUse(name){ post('api/profile/use', {name}).then(t); }
+function drawAreas(){
+  const c = $('draw'), img = $('vidData'); if (!S) return;
+  const [x, w, h] = canvasCtx(c); const fh = S.dataset.frame[0], fw = S.dataset.frame[1], sx = w / fw, sy = h / fh;
+  x.lineWidth = 2; x.font = '600 13px system-ui';
+  for (const [n, b] of Object.entries(S.dataset.areas)){ x.strokeStyle = '#38bdf8'; x.setLineDash([7, 5]);
+    x.strokeRect(b[0] * sx, b[1] * sy, b[2] * sx, b[3] * sy); x.setLineDash([]); x.fillStyle = '#38bdf8'; x.fillText('place ' + n, b[0] * sx + 8, b[1] * sy + b[3] * sy - 10); }
+  if (drawing && drawing.box){ const b = drawing.box; x.strokeStyle = '#f59e0b'; x.lineWidth = 3; x.strokeRect(b[0], b[1], b[2], b[3]); }
+}
+function rmPlace(){ const n = prompt('Remove which bag place? (e.g. 2)'); if (n) post('api/dataset/area/remove', {name: n.trim()}).then(t); }
+function startDraw(name){ drawing = {name}; $('drawHint').style.display = ''; $('drawHint').textContent = `drag a box over bag place ${name}, release to save`; }
+(() => { const c = $('draw');
+  c.onmousedown = e => { if (!drawing) return; const r = c.getBoundingClientRect(); drawing.x0 = e.clientX - r.left; drawing.y0 = e.clientY - r.top; drawing.box = [drawing.x0, drawing.y0, 0, 0]; };
+  c.onmousemove = e => { if (!drawing || drawing.x0 == null) return; const r = c.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top;
+    drawing.box = [Math.min(x, drawing.x0), Math.min(y, drawing.y0), Math.abs(x - drawing.x0), Math.abs(y - drawing.y0)]; drawAreas(); };
+  c.onmouseup = () => { if (!drawing || !drawing.box) return; const r = c.getBoundingClientRect(), fw = S.dataset.frame[1], fh = S.dataset.frame[0];
+    const b = drawing.box, k = fw / r.width, kh = fh / r.height; const box = [b[0] * k, b[1] * kh, b[2] * k, b[3] * kh].map(Math.round);
+    const name = drawing.name; drawing = null; $('drawHint').style.display = 'none';
+    if (box[2] < 50 || box[3] < 50) return toast('box too small - try again');
+    post('api/dataset/area', {name, box}).then(t); };
+})();
+</script>
+</body>
+</html>

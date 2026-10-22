@@ -1,0 +1,20 @@
+# Industrial Edge supports compose file version 2.4.
+# Import this file in the Industrial Edge App Publisher (or run "docker compose up -d" on a plain IPC).
+version: "2.4"
+services:
+  bagvision:
+    image: bagvision:1.0.0
+    restart: unless-stopped
+    # direct access to the USB robots (/dev/ttyACM*) and the RealSense camera (/dev/bus/usb, /dev/video*)
+    privileged: true
+    # host network: the dashboard is reached at http://<IPC address>:8000
+    network_mode: host
+    environment:
+      - PORT=8000
+    mem_limit: 6g
+    volumes:
+      - /dev:/dev
+      - /run/udev:/run/udev:ro
+      - ./publish/bagvision:/data
+    # IPC with an NVIDIA GPU: build with TORCH=cu130 and uncomment
+    # runtime: nvidia

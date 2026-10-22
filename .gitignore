@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+.venv/
+
+# bag photos, inspection results and logs (large - stay on the machine)
+bag_data/
+captures/
+inspections/
+so100_logs/
+
+# runtime state of this machine
+jobs/stack_state.json
+ai_server.json
+
+# training output, downloaded base models, built images
+bag_models/run/
+yolo11*-cls.pt
+yolo26n.pt
+edge/stage/
+edge/full_app/stage/
+edge/*.tar
+edge/full_app/*.tar
+
+# old copies
+backup_*/
+uarm_pick_place_backup_*.py
+
+# separate repository
+bagvision-yolo/

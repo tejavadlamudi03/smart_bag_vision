@@ -1,0 +1,8 @@
+numpy>=1.26
+opencv-python>=4.9
+pyserial>=3.5
+pyrealsense2>=2.55
+torch>=2.3
+torchvision>=0.18
+ultralytics==8.4.36
+matplotlib
