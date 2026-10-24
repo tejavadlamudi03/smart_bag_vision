@@ -11,6 +11,7 @@ so100_logs/
 # runtime state of this machine
 jobs/stack_state.json
 ai_server.json
+camera.json
 
 # training output, downloaded base models, built images
 bag_models/run/

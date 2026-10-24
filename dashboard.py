@@ -47,6 +47,7 @@ EMPTY_FRAMES = 5           # place empty this long = ready for the next bag
 ANOM_EVERY = 0.3           # s between anomaly checks of a place (~50 ms each on the GPU)
 CHECK_BAND = 0.92          # anomaly above 92 % of the threshold (but below it) = CHECK, sent to review
 CHECK_COLOR = (0, 170, 255)
+CAMERA_FILE = os.path.join(HERE, "camera.json")   # which camera the dashboard uses
 AI_FILE = os.path.join(HERE, "ai_server.json")     # where the AI runs (empty url = this laptop)
 LAST_RUN_FILE = os.path.join(HERE, "captures", "last_sequence.json")     # for "Continue sequence"
 MODE_FILE = os.path.join(HERE, "bag_models", "detector_mode.txt")   # "classifier" or "anomaly"
@@ -71,26 +72,41 @@ CAMERA_STALL = 8.0          # s without a new picture -> open the camera again (
 
 
 class CameraFeed:
-    """Reads the RealSense in its own thread. librealsense can block for ever on a camera that was
-    unplugged, so a watchdog opens the camera again (as a new reader) when pictures stop coming,
-    and keeps trying while it is not connected."""
+    """Reads the chosen camera (RealSense, a webcam or a stream) in its own thread. librealsense can
+    block for ever on a camera that was unplugged, so a watchdog opens the camera again (as a new
+    reader) when pictures stop coming, and keeps trying while it is not connected."""
 
     def __init__(self):
         self.cv = threading.Condition()
         self.img, self.seq, self.t = None, 0, 0.0
         self.cam, self.gen, self.opening, self.error = None, None, 0.0, "starting"
+        self.source = "realsense"
+        if os.path.exists(CAMERA_FILE):
+            self.source = json.load(open(CAMERA_FILE)).get("source") or "realsense"
         threading.Thread(target=self._watch, daemon=True, name="camera-watch").start()
+
+    def set_source(self, source):
+        """Switch to another camera: 'realsense', a webcam number or a stream / video address."""
+        source = str(source or "realsense").strip()
+        with open(CAMERA_FILE, "w") as f:
+            json.dump({"source": source}, f)
+        old, self.gen, self.cam = self.cam, None, None
+        self.source = source
+        if old is not None:
+            self._stop_quietly(old)                   # free the device before the new one opens
+        self.error, self.opening, self.t = "switching camera ...", 0.0, 0.0
+        return f"camera: {source}"
 
     def _open(self):
         try:
-            cam = bi.Camera()
+            cam = bi.open_camera(self.source)
         except BaseException as e:                    # bi.Camera raises SystemExit when it is missing
             self.error = str(e) or "camera not found"
             self.opening = 0.0
             return
         gen = object()
         self.cam, self.gen, self.t, self.error, self.opening = cam, gen, time.time(), "", 0.0
-        print("[camera] connected")
+        print(f"[camera] connected: {self.source}")
         while self.gen is gen:
             try:
                 img = cam.frame()
@@ -121,7 +137,7 @@ class CameraFeed:
     @staticmethod
     def _stop_quietly(cam):
         try:
-            cam.pipe.stop()
+            cam.close()
         except Exception:
             pass
 
@@ -146,6 +162,9 @@ class Vision:
     def __init__(self):
         self.cam = CameraFeed()
         self.areas = bi.load_areas()
+        self.areas_frame = None                  # picture size the bag places were marked on
+        if os.path.exists(bi.AREAS_FILE):
+            self.areas_frame = json.load(open(bi.AREAS_FILE)).get("frame")
         self.empty = cv2.imread(bi.EMPTY_FILE) if os.path.exists(bi.EMPTY_FILE) else None
         self.model = bi.load_model() if os.path.exists(bi.BEST) else None
         self.anom, self.profile = None, None
@@ -186,6 +205,8 @@ class Vision:
         while self.running:
             try:
                 img, seq = self.cam.frame(seq)
+                if self.areas_frame != list(img.shape[:2]):
+                    self.fit_to_frame(img.shape)
             except Exception:                        # no picture: the camera feed reconnects by itself
                 self.fps = 0.0
                 continue
@@ -272,6 +293,23 @@ class Vision:
             with self.frame_cv:
                 self.raw, self.jpeg = img, buf.tobytes()
                 self.frame_cv.notify_all()
+
+    def fit_to_frame(self, shape):
+        """The camera can come up at another resolution (USB 2 / USB 3 port): scale the bag places and
+        the empty-board picture so they stay on the same spot of the board."""
+        h, w = shape[:2]
+        if self.areas_frame and self.areas:
+            fy, fx = h / self.areas_frame[0], w / self.areas_frame[1]
+            with self.lock:
+                self.areas = {n: [round(b[0] * fx), round(b[1] * fy), round(b[2] * fx), round(b[3] * fy)]
+                              for n, b in self.areas.items()}
+                bi.save_areas(self.areas, shape)
+            print(f"camera picture is now {w}x{h} - bag places scaled to match")
+        self.areas_frame = [h, w]
+        if self.empty is not None and self.empty.shape[:2] != (h, w):
+            self.empty = cv2.resize(self.empty, (w, h), interpolation=cv2.INTER_AREA)
+        for st in self.places.values():
+            st["recent"] = []
 
     def paint_heat(self, view, box, hm):
         """Blend only the hot spots of the anomaly heatmap into the live video."""
@@ -399,6 +437,7 @@ class Vision:
         with self.lock:
             self.areas[name] = [int(v) for v in box]
             bi.save_areas(self.areas, shape)
+            self.areas_frame = list(shape[:2])
         return f"bag place {name} saved"
 
     def set_empty(self, force=False):
@@ -424,6 +463,7 @@ class Vision:
         with self.lock:
             self.areas.pop(name, None)
             bi.save_areas(self.areas, shape)
+            self.areas_frame = list(shape[:2])
         return self._msg(f"bag place {name} removed")
 
     def capture(self, label, img=None):
@@ -1325,7 +1365,7 @@ def make_handler(vision, cell, trainer):
                 self.send(200, {
                     "boot": BOOT, "time": time.strftime("%H:%M:%S"), "date": time.strftime("%a %d %b %Y"),
                     "vision": {"fps": round(vision.fps, 1), "model": vision.model is not None, "ai": vision.ai_state(),
-                               "camera": vision.cam.error,
+                               "camera": vision.cam.error, "camera_source": vision.cam.source,
                                "threshold": vision.threshold,
                                "anom_threshold": round(vision.anom.threshold, 2) if vision.anom else None,
                                "places": {n: {"result": s["result"], "conf": round(s["conf"] * 100),
@@ -1422,6 +1462,10 @@ def make_handler(vision, cell, trainer):
                     r = vision.set_remote(b.get("url", ""), b.get("token", ""))
                 elif p == "/api/job/rename":
                     r = cell.robots[b["robot"]].rename_job(int(b["job"]), b.get("name", ""))
+                elif p == "/api/camera/list":
+                    r = {"cameras": bi.list_cameras(), "current": vision.cam.source}
+                elif p == "/api/camera":
+                    r = vision.cam.set_source(b.get("source"))
                 elif p == "/api/sequence/stop":
                     cell.seq["stop"].set()
                     r = "stopping"

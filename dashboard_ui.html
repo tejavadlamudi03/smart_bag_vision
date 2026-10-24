@@ -261,6 +261,9 @@ table.hist td{padding:7px 8px;border-bottom:1px solid var(--line)}
         <span class="hint" id="thrL">BAD threshold</span><input type="range" id="thr" min="0.1" max="0.9" step="0.05" style="width:120px">
         <b id="thrV" style="width:34px">0.50</b><button onclick="snap()">Snapshot</button></span></h3>
       <div class="video"><img id="vidLive" alt="live camera"><div class="ov"><span class="chip" id="chipFps">–</span></div></div>
+      <div class="row" style="margin-top:12px;flex-wrap:nowrap"><span class="hint" style="white-space:nowrap">Camera</span>
+        <select id="camSel" style="max-width:460px" onchange="setCam(this.value)"></select>
+        <button onclick="loadCams()" title="search for cameras again">↻</button></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
       <div class="card"><h3>Bag places<span class="r hint" id="liveType"></span></h3><div class="places" id="placesLive"></div></div>
@@ -662,6 +665,15 @@ function setBags(){ const n = $('bg_uarm').value; if (n === '') return toast('ty
   post('api/uarm/bags', {job: +$('j_uarm').value, count: +n}).then(t); }
 function setTouch(on){ post('api/uarm/touch', {job: +$('j_uarm').value, on}).then(t); }
 function setStack(){ post('api/stack', {job: +$('j_uarm').value, taken: +$('st_uarm').value}).then(() => toast('stack position set')); }
+async function loadCams(){ const r = await post('api/camera/list'); const m = (r && r.msg) || {};
+  const cams = m.cameras || [], cur = m.current || 'realsense';
+  const opts = cams.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`);
+  if (!cams.some(c => c.id === cur)) opts.unshift(`<option value="${esc(cur)}">${esc(cur === 'realsense' ? 'RealSense (not connected)' : cur)}</option>`);
+  opts.push('<option value="__url">Stream / video address…</option>');
+  $('camSel').innerHTML = opts.join(''); $('camSel').value = cur; }
+function setCam(v){ if (v === '__url'){ v = prompt('Stream or video address, e.g. rtsp://192.168.1.20/stream or /home/me/video.mp4'); if (!v){ loadCams(); return; } }
+  post('api/camera', {source: v}).then(r => { t(r); setTimeout(loadCams, 500); }); }
+loadCams();
 function setAi(on){ post('api/ai', on ? {url: $('aiUrl').value.trim(), token: $('aiTok').value.trim()} : {url: ''}).then(t); }
 function jobLabel(j){ return `Job ${j.job}` + (j.name ? ` "${esc(j.name)}"` : ''); }
 function renameJob(key){ const job = +$('j_' + key).value; const j = S.robots[key].jobs.find(x => x.job == job);

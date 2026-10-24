@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Paper bag inspection with the RealSense D435: EMPTY / GOOD / BAD for each bag place.
+Paper bag inspection: EMPTY / GOOD / BAD for each bag place.
+Camera: the RealSense D435 (default) or any webcam / stream:  --camera 0  /  --camera rtsp://...
 
   python3 bag_inspect.py capture          # 1. mark the bag places, take labelled photos
   python3 bag_inspect.py train            # 2. train the model on the GPU (a few minutes)
@@ -48,6 +49,7 @@ BAG_DIFF = 12.0                                  # how different from the empty 
 EMPTY_REL = 0.4                                  # another place differing < 40 % as much = empty
 # (relative, because the camera's auto-brightness shifts the empty places too when a bag is in view)
 WIN = "Paper bag inspection"
+CAMERA_SOURCE = "realsense"                      # set with --camera
 
 
 # --- camera ---------------------------------------------------------------------------------
@@ -83,6 +85,58 @@ class Camera:
     def close(self):
         self.sensor.set_option(self.rs.option.enable_auto_exposure, 1)
         self.pipe.stop()
+
+
+class Webcam:
+    """Any camera OpenCV can open: a number (0 = /dev/video0), a stream (rtsp://, http://) or a video file."""
+
+    def __init__(self, source):
+        self.cap = cv2.VideoCapture(int(source) if str(source).isdigit() else source)
+        if not self.cap.isOpened():
+            raise SystemExit(f"could not open camera '{source}'")
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))   # most webcams give HD only as MJPG
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)       # the best the camera offers, up to 1080p
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        if self.frame() is None:
+            raise SystemExit(f"camera '{source}' sends no pictures")
+
+    def frame(self):
+        ok, img = self.cap.read()
+        if not ok:
+            raise RuntimeError("the camera stopped sending pictures")
+        return img
+
+    def toggle_exposure(self):
+        return "not available for this camera"
+
+    def close(self):
+        self.cap.release()
+
+
+def open_camera(source="realsense"):
+    """'realsense' = the Intel RealSense, a number = /dev/videoN, anything else = stream URL or video file."""
+    return Camera() if source in ("realsense", "", None) else Webcam(source)
+
+
+def list_cameras():
+    """Cameras that can be chosen: [{"id": ..., "name": ...}] - the RealSense and every webcam."""
+    out = []
+    try:
+        import pyrealsense2 as rs
+        for d in rs.context().query_devices():
+            out.append({"id": "realsense", "name": f"{d.get_info(rs.camera_info.name)} (RealSense)"})
+    except Exception:
+        pass
+    for path in sorted(glob.glob("/sys/class/video4linux/video*"), key=lambda p: int(p.rsplit("video", 1)[1])):
+        try:
+            name = open(os.path.join(path, "name")).read().strip()
+            index = open(os.path.join(path, "index")).read().strip()
+        except OSError:
+            continue
+        n = path.rsplit("video", 1)[1]
+        if index == "0" and "realsense" not in name.lower():   # one entry per webcam (not its metadata node)
+            out.append({"id": n, "name": f"{name.split(':')[0]} (/dev/video{n})"})
+    return out
 
 
 # --- bag places (areas) ------------------------------------------------------------------------
@@ -133,7 +187,7 @@ def cmd_capture():
     for c in LABELS:
         os.makedirs(os.path.join(CROPS, c), exist_ok=True)
     os.makedirs(FULL, exist_ok=True)
-    cam = Camera()
+    cam = open_camera(CAMERA_SOURCE)
     areas = load_areas()
     empty = cv2.imread(EMPTY_FILE) if os.path.exists(EMPTY_FILE) else None
     cv2.namedWindow(WIN, cv2.WINDOW_NORMAL)
@@ -334,7 +388,7 @@ def need_areas():
 
 
 def cmd_inspect(bad_threshold):
-    model, areas, cam = load_model(), need_areas(), Camera()
+    model, areas, cam = load_model(), need_areas(), open_camera(CAMERA_SOURCE)
     day = os.path.join(OUT, time.strftime("%Y%m%d"))
     os.makedirs(day, exist_ok=True)
     log = os.path.join(day, "results.csv")
@@ -401,7 +455,10 @@ def cmd_check(target, bad_threshold):
 
 
 def main():
+    global CAMERA_SOURCE
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--camera", default="realsense",
+                    help="realsense (default), a webcam number (0, 1, ...) or a stream / video address")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("capture")
     t = sub.add_parser("train")
@@ -413,6 +470,7 @@ def main():
     c.add_argument("target")
     c.add_argument("--threshold", type=float, default=0.5)
     a = ap.parse_args()
+    CAMERA_SOURCE = a.camera
     if a.cmd == "capture":
         cmd_capture()
     elif a.cmd == "train":
