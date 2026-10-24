@@ -28,3 +28,7 @@ uarm_pick_place_backup_*.py
 
 # separate repository
 bagvision-yolo/
+
+# arms used only on this machine
+robots.local.json
+so100_settings.local.json

@@ -47,7 +47,8 @@ EMPTY_FRAMES = 5           # place empty this long = ready for the next bag
 ANOM_EVERY = 0.3           # s between anomaly checks of a place (~50 ms each on the GPU)
 CHECK_BAND = 0.92          # anomaly above 92 % of the threshold (but below it) = CHECK, sent to review
 CHECK_COLOR = (0, 170, 255)
-CAMERA_FILE = os.path.join(HERE, "camera.json")   # which camera the dashboard uses
+CAMERA_FILE = os.path.join(HERE, "camera.json")
+LOCAL_ROBOTS_FILE = os.path.join(HERE, "robots.local.json")   # extra arms kept out of git   # which camera the dashboard uses
 AI_FILE = os.path.join(HERE, "ai_server.json")     # where the AI runs (empty url = this laptop)
 LAST_RUN_FILE = os.path.join(HERE, "captures", "last_sequence.json")     # for "Continue sequence"
 MODE_FILE = os.path.join(HERE, "bag_models", "detector_mode.txt")   # "classifier" or "anomaly"
@@ -806,8 +807,11 @@ class Cell:
         self.vision = vision
         self.robots = {"uarm": Robot("uarm", "uArm Swift Pro", "uarm"),
                        "arm1": Robot("arm1", "SO-100 Arm 1", "so", "1"),
-                       "arm2": Robot("arm2", "SO-100 Arm 2", "so", "2"),
-                       "buddy": Robot("buddy", "SO-100 Buddy", "so", "buddy")}
+                       "arm2": Robot("arm2", "SO-100 Arm 2", "so", "2")}
+        # extra SO-100 arms used only on this machine: robots.local.json = [{"key", "title", "arm"}]
+        if os.path.exists(LOCAL_ROBOTS_FILE):
+            for e in json.load(open(LOCAL_ROBOTS_FILE)):
+                self.robots[e["key"]] = Robot(e["key"], e["title"], "so", e["arm"])
         self.teach = None
         self.seq = {"running": False, "cycle": 0, "cycles": 0, "step": "", "log": [], "stop": threading.Event()}
         self.alarms = []

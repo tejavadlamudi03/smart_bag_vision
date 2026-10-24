@@ -58,12 +58,21 @@ class ArmError(RuntimeError):
 
 
 # --- Feetech bus ----------------------------------------------------------------
+def _read_json(path):
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    return {}
+
+
+def all_settings():
+    """Every arm's settings: the shared file plus the local-only file (arms kept out of git)."""
+    return {**_read_json(SETTINGS_FILE), **_read_json(LOCAL_SETTINGS_FILE)}
+
+
 def arm_names():
     """{adapter serial: name} as set with the 'name' command (e.g. '1', '2')."""
-    if not os.path.exists(SETTINGS_FILE):
-        return {}
-    with open(SETTINGS_FILE) as f:
-        return {k: v["name"] for k, v in json.load(f).items() if v.get("name")}
+    return {k: v["name"] for k, v in all_settings().items() if v.get("name")}
 
 
 def resolve_arm(arm, serials):
@@ -652,19 +661,16 @@ def cmd_move(arm, kin, target, speed, pitch, direct):
 
 def load_settings(arm):
     """Settings of THIS arm (keyed by its USB adapter serial): rest pose, gripper direction."""
-    if os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE) as f:
-            return json.load(f).get(str(arm.bus.serial), {})
-    return {}
+    return all_settings().get(str(arm.bus.serial), {})
 
 
 def save_settings(arm, s):
-    allarms = {}
-    if os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE) as f:
-            allarms = json.load(f)
-    allarms[str(arm.bus.serial)] = s
-    with open(SETTINGS_FILE, "w") as f:
+    """Saved where the arm is listed: the local-only file for local arms, else the shared file."""
+    key = str(arm.bus.serial)
+    path = LOCAL_SETTINGS_FILE if key in _read_json(LOCAL_SETTINGS_FILE) else SETTINGS_FILE
+    allarms = _read_json(path)
+    allarms[key] = s
+    with open(path, "w") as f:
         json.dump(allarms, f, indent=1)
 
 
@@ -720,6 +726,7 @@ def cmd_gripper(arm, how):
 # --- teach by hand & replay (joint space - needs no calibration) -----------------------
 JOBS_DIR = os.path.join(HERE, "so100_jobs")
 SETTINGS_FILE = os.path.join(HERE, "so100_settings.json")
+LOCAL_SETTINGS_FILE = os.path.join(HERE, "so100_settings.local.json")   # arms used only on this machine
 GRIP_WAIT = 0.6        # s for the gripper to close / open during replay
 
 
@@ -1333,8 +1340,7 @@ def cmd_copy_jobs(arm, src, jobs):
     src = srcs[0]
     if src == str(arm.bus.serial):
         raise ArmError("that is the arm connected now - choose the OTHER arm with --from")
-    with open(SETTINGS_FILE) as f:
-        lim_src = json.load(f).get(src, {}).get("limits")
+    lim_src = all_settings().get(src, {}).get("limits")
     if not lim_src:
         raise ArmError(f"the end stops of arm {src} are unknown - connect it once and run  info  on it")
     lim_dst = [list(arm.limits[i]) for i in IDS]

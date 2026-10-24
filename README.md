@@ -38,7 +38,6 @@ flowchart LR
         UARM["uArm Swift Pro<br/>suction cup + touch switch"]
         A1["SO-100 Arm 1"]
         A2["SO-100 Arm 2"]
-        BUD["SO-100 Buddy"]
         LEAD["SO-100 leader arm<br/>(teaching)"]
         CAM["Camera<br/>RealSense · webcam · stream"]
     end
@@ -58,7 +57,6 @@ flowchart LR
     UARM <-->|USB G-code| CTRL
     A1 <-->|USB servo bus| CTRL
     A2 <-->|USB servo bus| CTRL
-    BUD <-->|USB servo bus| CTRL
     LEAD -->|USB servo bus| CTRL
     CAM -->|USB / network| CF
     CF -->|bag-place crops| AI
@@ -151,8 +149,9 @@ While Arm 2 sorts, the uArm already picks the next bag. On the prototype one cyc
 |---|---|---|---|
 | `1` (Arm 1) | `5B14030143` | 12 V STS3215 | 12 V |
 | `2` (Arm 2) | `5B14113529` | 12 V STS3215 | 12 V |
-| `buddy` | `5A7C123263` | **7.4 V** STS3215 (8 V limit) | **5 V**, never 12 V |
 | `leader` | `5B14030142` | 7.4 V STS3215 | 5 V |
+
+**Arms used only on one machine** stay out of git: list them in `robots.local.json` (`[{"key": "arm3", "title": "SO-100 Arm 3", "arm": "3"}]`, adds them to the dashboard) and keep their settings in `so100_settings.local.json`. Both files are ignored by git.
 
 The 7.4 V and 12 V servos look the same and report the same model number. The voltage limit stored in each servo tells them apart, and the software refuses to switch motors on above that limit.
 

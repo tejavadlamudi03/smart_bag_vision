@@ -237,7 +237,7 @@ table.hist td{padding:7px 8px;border-bottom:1px solid var(--line)}
     <div class="sysrow"><span><span class="led" id="led_uarm"></span>uArm</span></div>
     <div class="sysrow"><span><span class="led" id="led_arm1"></span>SO-100 Arm 1</span></div>
     <div class="sysrow"><span><span class="led" id="led_arm2"></span>SO-100 Arm 2</span></div>
-    <div class="sysrow"><span><span class="led" id="led_buddy"></span>SO-100 Buddy</span></div>
+    <div id="ledExtra"></div>
   </div>
 </aside>
 
@@ -342,7 +342,7 @@ table.hist td{padding:7px 8px;border-bottom:1px solid var(--line)}
   <div class="grid2">
     <div class="card"><h3>Teach a job by hand</h3>
       <div class="ctl">
-        <label class="f">Robot<select id="tRobot"><option value="arm1">SO-100 Arm 1</option><option value="arm2">SO-100 Arm 2</option><option value="buddy">SO-100 Buddy</option><option value="uarm">uArm (suction)</option></select></label>
+        <label class="f">Robot<select id="tRobot"><option value="arm1">SO-100 Arm 1</option><option value="arm2">SO-100 Arm 2</option><option value="uarm">uArm (suction)</option></select></label>
         <label class="f">Job number<input type="number" id="tJob" value="1" min="1"></label>
         <label class="f" id="tModeWrap">Teach with<select id="tMode"><option value="hand">hand (arm goes limp)</option><option value="leader">leader arm (follower copies it)</option></select></label>
         <label class="f" id="tStepWrap">Bags in the stack now<input type="number" id="tBags" value="20" min="1"></label>
@@ -469,6 +469,9 @@ function render(){
   $('chipFps').style.background = v.camera ? 'var(--bad)' : '';
   $('ledCam').className = 'led ' + (v.fps > 1 ? 'ok' : 'bad');
   $('ledModel').className = 'led ' + (v.model ? 'ok' : 'bad'); $('modelTxt').textContent = v.model ? 'loaded' : 'not trained';
+  for (const [key, r] of Object.entries(S.robots)) if (!$('led_' + key)) {      // robots added on this machine
+    $('ledExtra').insertAdjacentHTML('beforeend', `<div class="sysrow"><span><span class="led" id="led_${key}"></span>${esc(r.title)}</span></div>`);
+    $('tRobot').insertAdjacentHTML('beforeend', `<option value="${key}">${esc(r.title)}</option>`); }
   for (const [key, r] of Object.entries(S.robots)) $('led_' + key).className = 'led ' + (!r.connected ? 'bad' : r.busy ? 'busy' : 'ok');
   $('revBadge').textContent = k.pending_review; $('revBadge').style.display = k.pending_review ? 'inline-block' : 'none';
   if (document.activeElement !== $('thr')) { $('thr').value = v.threshold; $('thrV').textContent = (+v.threshold).toFixed(2); }
@@ -558,7 +561,7 @@ function drawRing(k){
 /* ---------- status bar + flow ---------- */
 const STEP_INFO = {uarm: ['🦾', 'uArm', 'picks a bag'], photo1: ['📷', 'Camera', 'checks the bag'], arm1: ['🤖', 'Arm 1', 'job'],
   photo2: ['📷', 'Camera', 'checks again'], arm2: ['🤖', 'Arm 2', 'good / bad job']};
-const RNAME = {uarm: 'uArm', arm1: 'Arm 1', arm2: 'Arm 2', buddy: 'Buddy', camera: 'Camera'};
+const RNAME = {uarm: 'uArm', arm1: 'Arm 1', arm2: 'Arm 2', camera: 'Camera'};
 function stepStates(q){
   const st = Object.assign({}, (q.flow && q.flow.steps) || {}); const keys = Object.keys(STEP_INFO);
   if (q.running){ const a = keys.findIndex(k => st[k] === 'active'); const nx = keys.findIndex((k, i) => i > a && st[k] !== 'done');
